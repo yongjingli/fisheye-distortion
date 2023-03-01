@@ -159,6 +159,7 @@ def _process_file(f_json: Path, f_img: Path, dir_output: Path, dist_coeff: np.nd
 
     # Save Result
     out_filename = dir_output / f"{f_img.stem}.dist{f_img.suffix}"
+    print(out_filename)
     if f_img.suffix == '.tif' or f_img.suffix == '.tiff':
         tifffile.imsave(out_filename, dist_img, compress=1)
     else:
