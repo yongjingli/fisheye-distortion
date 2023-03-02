@@ -257,7 +257,7 @@ def distort_image(img: np.ndarray, cam_intr: np.ndarray, dist_coeff: np.ndarray,
     if chan == 1:
         fill_value = 0
     else:
-        fill_value = 125
+        fill_value = 0
 
     interpolators = [scipy.interpolate.RegularGridInterpolator((ys, xs), img[:, :, channel], method=mode,
                                                                bounds_error=False, fill_value=fill_value)
@@ -297,6 +297,10 @@ def distort_image(img: np.ndarray, cam_intr: np.ndarray, dist_coeff: np.ndarray,
             top_left = np.ceil(distorted_px[0, 0, :]).astype(np.int)
             bottom_right = np.floor(distorted_px[(h - 1), (w - 1), :]).astype(np.int)
             img_dist = img_dist[top_left[1]:bottom_right[1], top_left[0]:bottom_right[0], :]
+
+            height_min = top_left[1]
+            width_min = top_left[0]
+
         elif crop_type == "middle":
             # Get the widest point of original image, then get the corners from that.
             width_min = np.ceil(distorted_px[int(h / 2), 0, 0]).astype(np.int32)
@@ -306,31 +310,43 @@ def distort_image(img: np.ndarray, cam_intr: np.ndarray, dist_coeff: np.ndarray,
             img_dist = img_dist[height_min:height_max, width_min:width_max]
         else:
             raise ValueError
+    else:
+        width_min = 0
+        height_min = 0
 
     if chan == 1:
         img_dist = img_dist[:, :, 0]
 
-    return img_dist
+    return img_dist, width_min, height_min
 
 
 def get_distort_img_line_map(img, object_map, cls_map, order_map,
                              calib_infos, mode, crop_output, crop_type):
-    dist_img = distort_image(img, calib_infos["cam_K"], calib_infos["dsitort"], mode,
+    dist_img, width_min, height_min = distort_image(img, calib_infos["cam_K"], calib_infos["dsitort"], mode,
                              crop_output, crop_type)
 
-    dist_object_map = distort_image(object_map, calib_infos["cam_K"], calib_infos["dsitort"], mode,
+    dist_object_map, width_min, height_min = distort_image(object_map, calib_infos["cam_K"], calib_infos["dsitort"], mode,
                                     crop_output, crop_type)
 
-    dist_cls_map = distort_image(cls_map, calib_infos["cam_K"], calib_infos["dsitort"], mode,
+    dist_cls_map, width_min, height_min = distort_image(cls_map, calib_infos["cam_K"], calib_infos["dsitort"], mode,
                                  crop_output, crop_type)
 
-    dist_order_map = distort_image(order_map, calib_infos["cam_K"], calib_infos["dsitort"], mode,
+    dist_order_map, width_min, height_min = distort_image(order_map, calib_infos["cam_K"], calib_infos["dsitort"], mode,
                                    crop_output, crop_type)
+
+    new_cam_k = copy.deepcopy(calib_infos["cam_K"])
+    new_cam_k[0, 2] = new_cam_k[0, 2] - width_min
+    new_cam_k[1, 2] = new_cam_k[1, 2] - height_min
 
     infos = {"dist_img": dist_img,
              "dist_object_map": dist_object_map,
              "dist_cls_map": dist_cls_map,
-             "dist_order_map": dist_order_map,}
+             "dist_order_map": dist_order_map,
+             "cam_K": calib_infos["cam_K"],
+             "new_cam_k": new_cam_k,
+             "dsitort": calib_infos["dsitort"],
+             "baseline": calib_infos["baseline"]
+             }
     return infos
 
 
